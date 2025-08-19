@@ -1,0 +1,8 @@
+{
+  "name": "shuffle-sort-example",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node javascript_example.js"
+  }
+}
