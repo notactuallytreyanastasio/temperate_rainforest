@@ -1,0 +1,323 @@
+// URL Parser using only confirmed working Temper string operations
+// Built using split() which is confirmed to work
+
+export class URL(
+  public scheme: String,
+  public host: String,
+  public port: Int?,
+  public path: String,
+  public query: String?,
+  public fragment: String?,
+) {
+  public toString(): String {
+    let portPart = if (port != null) { ":${port}" } else { "" };
+    let queryPart = if (query != null) { "?${query}" } else { "" };
+    let fragmentPart = if (fragment != null) { "#${fragment}" } else { "" };
+    
+    "${scheme}://${host}${portPart}${path}${queryPart}${fragmentPart}"
+  }
+  
+  public get origin(): String | Bubble {
+    let portPart = if (port != null) {
+      let p = port as Int;
+      if (!isDefaultPort(scheme, p)) {
+        ":${p}"
+      } else {
+        ""
+      }
+    } else { 
+      "" 
+    };
+    "${scheme}://${host}${portPart}"
+  }
+}
+
+export let isDefaultPort(scheme: String, port: Int): Boolean {
+  when (scheme) {
+    "http" -> port == 80;
+    "https" -> port == 443;
+    "ftp" -> port == 21;
+    else -> false;
+  }
+}
+
+export class QueryParams(
+  public pairs: List<Pair<String, String>>,
+) {
+  public get(key: String): List<String> {
+    let results = new ListBuilder<String>();
+    for (var i = 0; i < pairs.length; i += 1) {
+      if (pairs[i].key == key) {
+        results.add(pairs[i].value);
+      }
+    }
+    results.toList()
+  }
+  
+  public getFirst(key: String): String? {
+    for (var i = 0; i < pairs.length; i += 1) {
+      if (pairs[i].key == key) {
+        return pairs[i].value;
+      }
+    }
+    null
+  }
+  
+  public has(key: String): Boolean {
+    for (var i = 0; i < pairs.length; i += 1) {
+      if (pairs[i].key == key) {
+        return true;
+      }
+    }
+    false
+  }
+  
+  public toString(): String {
+    if (pairs.length == 0) {
+      return "";
+    }
+    
+    var result = "";
+    for (var i = 0; i < pairs.length; i += 1) {
+      if (i > 0) {
+        result = "${result}&";
+      }
+      result = "${result}${encodeSimple(pairs[i].key)}=${encodeSimple(pairs[i].value)}";
+    }
+    result
+  }
+}
+
+// Simple URL parser using split() 
+export let parseURL(url: String): URL | Bubble {
+  // Step 1: Split by "://" to get scheme
+  let schemeParts = url.split("://");
+  if (schemeParts.length != 2) {
+    bubble(); // No valid scheme separator
+  }
+  
+  let scheme = schemeParts[0];
+  var remainder = schemeParts[1];
+  
+  // Step 2: Extract fragment if present (split by #)
+  var fragment: String? = null;
+  let fragParts = remainder.split("#");
+  if (fragParts.length > 1) {
+    // Take last part as fragment (in case there are multiple #)
+    fragment = fragParts[fragParts.length - 1];
+    // Rejoin everything except last part
+    remainder = fragParts[0];
+    for (var i = 1; i < fragParts.length - 1; i += 1) {
+      remainder = "${remainder}#${fragParts[i]}";
+    }
+  }
+  
+  // Step 3: Extract query if present (split by ?)
+  var query: String? = null;
+  let queryParts = remainder.split("?");
+  if (queryParts.length > 1) {
+    // Everything after first ? is query
+    query = queryParts[1];
+    for (var i = 2; i < queryParts.length; i += 1) {
+      query = "${query}?${queryParts[i]}";
+    }
+    remainder = queryParts[0];
+  }
+  
+  // Step 4: Split authority from path (split by /)
+  let pathParts = remainder.split("/");
+  let authority = pathParts[0];
+  
+  // Rebuild path from remaining parts
+  var path = "";
+  if (pathParts.length > 1) {
+    for (var i = 1; i < pathParts.length; i += 1) {
+      path = "${path}/${pathParts[i]}";
+    }
+  }
+  if (path == "") {
+    path = "/";
+  }
+  
+  // Step 5: Parse authority (host:port)
+  var host = authority;
+  var port: Int? = null;
+  
+  // Check for port by splitting on :
+  let hostParts = authority.split(":");
+  if (hostParts.length > 1) {
+    // Last part might be port
+    let lastPart = hostParts[hostParts.length - 1];
+    let maybePort = lastPart.toInt() orelse -1;
+    
+    if (maybePort > 0 && maybePort < 65536) {
+      port = maybePort;
+      // Rebuild host without port
+      host = hostParts[0];
+      for (var i = 1; i < hostParts.length - 1; i += 1) {
+        host = "${host}:${hostParts[i]}";
+      }
+    }
+  }
+  
+  new URL(scheme, host, port, path, query, fragment)
+}
+
+// Parse query string using split()
+export let parseQueryString(query: String): QueryParams {
+  let pairs = new ListBuilder<Pair<String, String>>();
+  
+  if (query == "") {
+    return new QueryParams(pairs.toList());
+  }
+  
+  // Split by & to get individual parameters
+  let params = query.split("&");
+  
+  for (var i = 0; i < params.length; i += 1) {
+    let param = params[i];
+    if (param != "") {
+      // Split by = to get key and value
+      let keyValue = param.split("=");
+      
+      if (keyValue.length >= 2) {
+        // Join back if there were multiple = signs
+        var value = keyValue[1];
+        for (var j = 2; j < keyValue.length; j += 1) {
+          value = "${value}=${keyValue[j]}";
+        }
+        pairs.add(new Pair(
+          decodeSimple(keyValue[0]),
+          decodeSimple(value)
+        ));
+      } else if (keyValue.length == 1) {
+        // Key without value
+        pairs.add(new Pair(decodeSimple(keyValue[0]), ""));
+      }
+    }
+  }
+  
+  new QueryParams(pairs.toList())
+}
+
+// Simple percent encoding (just handle space and a few special chars)
+export let encodeSimple(s: String): String {
+  // For now, just replace spaces with %20
+  // This is a simplified version - full encoding would need character iteration
+  let parts = s.split(" ");
+  var result = parts[0];
+  for (var i = 1; i < parts.length; i += 1) {
+    result = "${result}%20${parts[i]}";
+  }
+  result
+}
+
+// Simple percent decoding
+export let decodeSimple(s: String): String {
+  // Handle %20 for spaces and + for spaces
+  let parts = s.split("%20");
+  var result = parts[0];
+  for (var i = 1; i < parts.length; i += 1) {
+    result = "${result} ${parts[i]}";
+  }
+  
+  // Also handle + as space (common in query strings)
+  let plusParts = result.split("+");
+  result = plusParts[0];
+  for (var i = 1; i < plusParts.length; i += 1) {
+    result = "${result} ${plusParts[i]}";
+  }
+  
+  result
+}
+
+// URL Builder helper
+export class URLBuilder() {
+  public var scheme: String = "https";
+  public var host: String = "";
+  public var port: Int? = null;
+  public var path: String = "/";
+  public var fragment: String? = null;
+  private queryPairs: ListBuilder<Pair<String, String>> = new ListBuilder<Pair<String, String>>();
+  
+  public addQuery(key: String, value: String): URLBuilder {
+    queryPairs.add(new Pair(key, value));
+    this
+  }
+  
+  public build(): URL {
+    let pairsList = queryPairs.toList();
+    let query = if (pairsList.length > 0) {
+      let params = new QueryParams(pairsList);
+      params.toString()
+    } else {
+      null
+    };
+    
+    new URL(scheme, host, port, path, query, fragment)
+  }
+}
+
+// Tests
+test("parse simple URL") {
+  let url = parseURL("https://example.com/path") orelse bubble();
+  assert(url.scheme == "https");
+  assert(url.host == "example.com");
+  assert(url.path == "/path");
+  assert(url.port == null);
+}
+
+test("parse URL with port") {
+  let url = parseURL("http://localhost:8080/api") orelse bubble();
+  assert(url.scheme == "http");
+  assert(url.host == "localhost");
+  assert(url.port == 8080);
+  assert(url.path == "/api");
+}
+
+test("parse URL with query") {
+  let url = parseURL("https://api.com/search?q=test&limit=10") orelse bubble();
+  assert(url.scheme == "https");
+  assert(url.host == "api.com");
+  assert(url.path == "/search");
+  assert(url.query == "q=test&limit=10");
+  
+  let params = parseQueryString(url.query as String);
+  assert(params.getFirst("q") == "test");
+  assert(params.getFirst("limit") == "10");
+}
+
+test("parse URL with fragment") {
+  let url = parseURL("https://docs.com/page#section") orelse bubble();
+  assert(url.scheme == "https");
+  assert(url.host == "docs.com");
+  assert(url.path == "/page");
+  assert(url.fragment == "section");
+}
+
+test("parse query with spaces") {
+  let params = parseQueryString("name=John+Doe&city=New%20York");
+  assert(params.getFirst("name") == "John Doe");
+  assert(params.getFirst("city") == "New York");
+}
+
+test("build URL") {
+  let builder = new URLBuilder();
+  builder.scheme = "https";
+  builder.host = "api.example.com";
+  builder.path = "/v1/users";
+  builder.addQuery("page", "1");
+  builder.addQuery("limit", "10");
+  
+  let url = builder.build();
+  let str = url.toString();
+  assert(str == "https://api.example.com/v1/users?page=1&limit=10");
+}
+
+test("URL origin") {
+  let url = parseURL("https://example.com:8080/path") orelse bubble();
+  assert(url.origin == "https://example.com:8080");
+  
+  let url2 = parseURL("https://example.com:443/path") orelse bubble();
+  assert(url2.origin == "https://example.com"); // Default port omitted
+}

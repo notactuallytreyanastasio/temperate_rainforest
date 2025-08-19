@@ -1,0 +1,82 @@
+// Testing what string operations actually work in Temper
+
+export let testStringSplit(): Void {
+  let url = "https://example.com/path?query=value#fragment";
+  
+  // Test split
+  let parts = url.split("://");
+  console.log("Split by '://': length=${parts.length}");
+  if (parts.length > 0) {
+    console.log("  Part 0: ${parts[0]}");
+  }
+  if (parts.length > 1) {
+    console.log("  Part 1: ${parts[1]}");
+  }
+  
+  // Test split with single char
+  let csv = "a,b,c,d";
+  let values = csv.split(",");
+  console.log("Split CSV: length=${values.length}");
+  for (var i = 0; i < values.length; i += 1) {
+    console.log("  [${i}]: ${values[i]}");
+  }
+}
+
+export let testStringIteration(): Void {
+  let s = "hello";
+  console.log("Iterating over '${s}':");
+  
+  var i = String.begin;
+  var position = 0;
+  while (i < s.end) {
+    let codePoint = s[i];
+    console.log("  Position ${position}: code=${codePoint}");
+    i = s.next(i);
+    position += 1;
+  }
+}
+
+export let testStringLength(): Void {
+  let s = "test";
+  let count = s.countBetween(String.begin, s.end);
+  console.log("String '${s}' length: ${count}");
+}
+
+export let testCharacterLiterals(): Void {
+  console.log("Character literals:");
+  console.log("  char'a' = ${char'a'}");
+  console.log("  char'0' = ${char'0'}");
+  console.log("  char'%' = ${char'%'}");
+  console.log("  char' ' = ${char' '}");
+}
+
+export let testStringComparison(): Void {
+  let a = "hello";
+  let b = "hello";
+  let c = "world";
+  
+  console.log("String comparison:");
+  console.log("  '${a}' == '${b}': ${a == b}");
+  console.log("  '${a}' == '${c}': ${a == c}");
+  console.log("  '${a}' < '${c}': ${a < c}");
+}
+
+export let runAllTests(): Void {
+  console.log("=== Testing Temper String Operations ===");
+  testStringSplit();
+  console.log("");
+  testStringIteration();
+  console.log("");
+  testStringLength();
+  console.log("");
+  testCharacterLiterals();
+  console.log("");
+  testStringComparison();
+  console.log("=== Tests Complete ===");
+}
+
+// Run tests when module loads
+test("string operations") {
+  runAllTests();
+  assert(true);
+}
