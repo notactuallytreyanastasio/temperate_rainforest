@@ -146,14 +146,12 @@ builder.addQuery("page", "1");
 URL newUrl = builder.build();
 ```
 
-## Weaksauce Stuff
+## Remaining Limitations
 
-Due to current Temper string handling limitations:
-- Full percent encoding/decoding is simplified (only handles spaces and a few special characters)
-- No support for URL username/password authentication
-- No support for IPv6 addresses
-- No support for relative URL resolution
-- No validation of URL structure beyond basic parsing
+Due to Temper language constraints:
+- No support for relative URL resolution (requires complex path logic)
+- UTF-8 sequences beyond ASCII need manual handling
+- No URL validation beyond basic structure
 
 ## Building
 
